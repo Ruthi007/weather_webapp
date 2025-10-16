@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Weather App</title>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="container">
+    <h1>Weather App</h1>
+    <input type="text" id="city" placeholder="Enter city name" />
+    <button onclick="getWeather()">Search</button>
+    <button onclick="getLocationWeather()">📍 Use My Location</button>
+    <button onclick="toggleUnit()">🌡 Toggle °C / °F</button>
+    <div id="weather" class="weather"></div>
+  </div>
+
+  <script>
+    let currentUnit = "celsius"; // default
+
+    async function getCoordinates(city) {
+      let url = `https://geocoding-api.open-meteo.com/v1/search?name=${city}&count=1`;
+      let res = await fetch(url);
+      let data = await res.json();
+      if (data.results && data.results.length > 0) {
+        return { lat: data.results[0].latitude, lon: data.results[0].longitude };
+      }
+      throw new Error("City not found");
+    }
+
+    async function getWeather() {
+      let city = document.getElementById("city").value;
+      if (!city) return alert("Please enter a city!");
+      try {
+        let { lat, lon } = await getCoordinates(city);
+        fetchWeather(lat, lon, city);
+      } catch (e) {
+        alert(e.message);
+      }
+    }
+
+    function getLocationWeather() {
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          fetchWeather(pos.coords.latitude, pos.coords.longitude, "Your Location");
+        },
+        () => alert("Location access denied.")
+      );
+    }
+
+    async function fetchWeather(lat, lon, place) {
+      let url = `https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true&daily=temperature_2m_max,temperature_2m_min,weathercode&temperature_unit=${currentUnit}&timezone=auto`;
+      let res = await fetch(url);
+      let data = await res.json();
+
+      let unitSymbol = currentUnit === "celsius" ? "°C" : "°F";
+
+      let weatherDiv = document.getElementById("weather");
+      weatherDiv.innerHTML = `
+        <h2>${place}</h2>
+        <p>🌡 Current Temp: ${data.current_weather.temperature}${unitSymbol}</p>
+        <p>💨 Wind: ${data.current_weather.windspeed} km/h</p>
+        <h3>7-Day Forecast</h3>
+        <div class="forecast">
+          ${data.daily.time.map((day, i) => `
+            <div class="day">
+              <strong>${day}</strong><br>
+              Max: ${data.daily.temperature_2m_max[i]}${unitSymbol}<br>
+              Min: ${data.daily.temperature_2m_min[i]}${unitSymbol}
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function toggleUnit() {
+      currentUnit = currentUnit === "celsius" ? "fahrenheit" : "celsius";
+      let city = document.getElementById("city").value;
+      if (city) {
+        getWeather();
+      } else {
+        getLocationWeather();
+      }
+    }
+  </script>
+</body>
+</html>
